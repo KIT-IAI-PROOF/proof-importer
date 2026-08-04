@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# bash script that creates a PROOF postgres database dump from a docker container called 'proof-postgres'
+#
+pathAndFileName=$(date +%Y_%m_%d_)proof-postgres-db-dump.sql
+
+
+if [ "$1" != "" ]; then
+echo $1
+    pathAndFileName=$1
+    if [ -f $1 ]; then
+        docker cp $1 proof-postgres:/tmp/$1 && docker exec proof-postgres sh -c "psql --username=admin proof < /tmp/$1"
+    else
+        echo "the given postgresql dump file does not exist!"
+        exit
+    fi
+else
+    echo "a postgresql dump file name must be given!"
+    exit
+fi
+
