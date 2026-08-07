@@ -1,0 +1,8 @@
+${AnsiStyle.BOLD}${AnsiColor.BLUE}################################################
+${AnsiColor.RED}            ${spring.application.name}
+${AnsiColor.BLUE}
+INSTITUTE FOR AUTOMATION AND APPLIED INFORMATICS
+     (C) KARLSRUHE INSTITUTE OF TECHNOLOGY
+${AnsiColor.RED}     Version: ${spring.application.version} (${spring.application.buildAt})
+${AnsiColor.BLUE}################################################
+${AnsiStyle.NORMAL}${AnsiColor.DEFAULT}

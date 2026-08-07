@@ -1,0 +1,6 @@
+debug/
+target/
+.idea
+src/main/resources/import/
+.metadata/
+.settings/

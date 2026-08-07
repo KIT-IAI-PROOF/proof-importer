@@ -1,0 +1,175 @@
+#!/bin/bash
+
+# PROOF Importer Starter Script
+# Usage: ./startImporter [--mvn] [--help]
+#   --mvn   : Use Maven to run (default: use JAR file)
+#   --help  : Show this help message
+
+show_help() {
+    cat << EOF
+PROOF Importer Starter Script
+
+Usage: $0 [OPTIONS]
+
+OPTIONS:
+    --mvn       Use Maven Spring Boot to run the importer (default: JAR file)
+    --help      Show this help message
+
+DESCRIPTION:
+    By default, the script uses the pre-built JAR file to import workflows/templates.
+    If the JAR file doesn't exist, it will be built automatically.
+    
+    Use --mvn flag to invoke Maven directly instead (slower, useful for development).
+
+EXAMPLES:
+    $0                  # Run with JAR file (default)
+    $0 --mvn            # Run with Maven
+    $0 --help           # Show this help
+
+EOF
+}
+
+# Parse command line arguments
+USE_MVN=false
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --mvn)
+            USE_MVN=true
+            shift
+            ;;
+        --help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+done
+
+# if [ "$#" -ne 2 ]; then
+#     echo "Illegal number of parameters"
+#     echo -e "usage (1st Version): \n $0 <template name> <PROOF workspace name>"
+#     echo -e " PROOF workspace name:  the place where the Python file should be copied to"
+#     echo -e "\n example: $0 /tmp/exporttest.json /develop/WS-PROOF/proof-environment/data"
+#     exit
+# fi
+LogLevel=DEBUG
+base_path=~/Workspace/proof/
+AttachmentsDir=$base_path/proof-environment/data/attachments
+# Can be either a single JSON file or a folder containing JSON files
+#Template=$base_path/proof-blocks/String2Float/ImportTemplate.json
+#Template=$base_path/proof-workflows/examples/ConceptDistributedWrapper/pyro5/block-pyro5-TestModel-client_copy.json
+Template=$base_path/proof-templates/FileReader/FileReader.json
+#Workflow=$base_path/proof-importer/standard-local.json
+Workflow=$base_path/proof-environment/data/workflows/demo_FileReader2FileWriter.json
+
+Save=true
+OverwriteDBContents=false
+PrintDBContents=true
+ImportWorkflow=false
+
+# Get the script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Function to run with JAR file or mvn command
+run() {
+    local arg_name="$1"
+    local arg_value="$2"
+    
+    local cmd=""
+
+    if ! $USE_MVN; then
+        # Look for the JAR file
+        JAR_FILE=$(find "$SCRIPT_DIR/target" -name "proof-importer-*.jar" -type f 2>/dev/null | head -1)
+        
+        # If no JAR found, build it
+        if [ -z "$JAR_FILE" ]; then
+            echo "JAR file not found. Building project..."
+            cd "$SCRIPT_DIR"
+            mvn package -q -DskipTests
+            JAR_FILE=$(find "$SCRIPT_DIR/target" -name "proof-importer-*.jar" -type f 2>/dev/null | head -1)
+        fi
+        
+        if [ -z "$JAR_FILE" ]; then
+            echo "ERROR: Could not find or build proof-importer JAR file"
+            exit 1
+        fi
+    
+        echo "Using JAR: $JAR_FILE"
+        
+        # Build the command
+        cmd="java -Dspring.config.location=file:$SCRIPT_DIR/src/main/resources/application.properties -Dserver.port=0 -jar \"$JAR_FILE\""
+    else
+        echo "Using Maven Spring Boot"
+        cd "$SCRIPT_DIR"
+        
+        # Build the Maven command
+        cmd="mvn spring-boot:run -Dspring-boot.run.arguments=\""
+        cmd="$cmd --spring.config.location=src/main/resources/application.properties"
+    fi
+
+    cmd="$cmd --printDBContents=$PrintDBContents"
+    cmd="$cmd --overwriteDBContents=$OverwriteDBContents"
+    cmd="$cmd --save=$Save"
+    cmd="$cmd --$arg_name=$arg_value"
+    cmd="$cmd --proofAttachmentsDir=$AttachmentsDir"
+    cmd="$cmd --loggingLevel=$LogLevel"
+
+    if $USE_MVN; then
+        cmd="$cmd \""
+    fi
+
+    echo "$cmd"
+
+    eval "$cmd"
+}
+
+if $ImportWorkflow; then
+    # Check if Workflow is a file
+    if [ -f "$Workflow" ]; then
+        echo "Processing single workflow file: $Workflow"
+        run "workflow" "$Workflow"
+    else
+        echo "File '$Workflow' does not exist!"
+    fi
+else
+    # Check if Template is a file
+    if [ -f "$Template" ]; then
+        echo "Processing single template file: $Template"
+        run "template" "$Template"
+    # Check if Template is a directory
+    elif [ -d "$Template" ]; then
+        echo "Processing all JSON files in folder: $Template"
+        json_files=("$Template"/*.json)
+        
+        if [ ! -e "${json_files[0]}" ]; then
+            echo "No JSON files found in folder: $Template"
+            exit 1
+        fi
+        
+        echo "Found ${#json_files[@]} JSON file(s):"
+        printf '%s\n' "${json_files[@]}"
+        echo ""
+        
+        for template_file in "${json_files[@]}"; do
+            echo "========================================="
+            echo "Processing template: $template_file"
+            echo "========================================="
+            run "template" "$template_file"
+            
+            if [ $? -ne 0 ]; then
+                echo "Error processing $template_file"
+                exit 1
+            fi
+        done
+        echo "========================================="
+        echo "All templates processed successfully!"
+        echo "========================================="
+    else
+        echo "Error: Template path does not exist or is neither a file nor a directory: $Template"
+        exit 1
+    fi
+fi
