@@ -1,0 +1,69 @@
+server:
+  port: 8090
+  servlet:
+    context-path: /
+
+spring:
+  application:
+    name: PROOF Importer Service (REST Wrapper)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/proof
+    username: admin
+    password: admin
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    edu.kit.iai.webis: DEBUG
+  config: classpath:logback.xml
+
+# CLI Wrapper Configuration
+cli:
+  jar-path: proof-importer-3.0.2.jar
+  java-executable: java
+  timeout-seconds: 300
+
+---
+# Development Profile
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5432/proof
+    username: admin
+    password: admin
+
+logging:
+  level:
+    root: INFO
+    edu.kit.iai.webis: DEBUG
+
+cli:
+  jar-path: target/proof-importer-3.0.2.jar
+  timeout-seconds: 300
+
+---
+# Production Profile
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://proof-postgres:5432/proof
+    username: ${DB_USER:admin}
+    password: ${DB_PASSWORD:admin}
+
+logging:
+  level:
+    root: WARN
+    edu.kit.iai.webis: INFO
+
+cli:
+  jar-path: /app/lib/proof-importer-cli.jar
+  timeout-seconds: 600
